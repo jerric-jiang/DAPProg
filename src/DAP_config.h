@@ -60,9 +60,9 @@ DAP Hardware I/O Pin Access Functions
 
 // Configure DAP I/O pins ------------------------------
 
-#define SWD_GPIO   	GPIOB
-#define PIN_SWCLK  	GPIO_Pin_13
-#define PIN_SWDIO  	GPIO_Pin_14
+#define SWD_GPIO    GPIOB
+#define PIN_SWCLK   GPIO_Pin_13
+#define PIN_SWDIO   GPIO_Pin_14
 
 
 /** Setup JTAG I/O pins: TCK, TMS, TDI, TDO, nTRST, and nRESET.
@@ -81,13 +81,13 @@ static void PORT_JTAG_SETUP(void)
 static void PORT_SWD_SETUP(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct;
-	
-	SWD_GPIO->BSRR = PIN_SWCLK | PIN_SWDIO;
-	
-	GPIO_InitStruct.GPIO_Pin = PIN_SWCLK | PIN_SWDIO;
-	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(SWD_GPIO, &GPIO_InitStruct);
+
+    SWD_GPIO->BSRR = PIN_SWCLK | PIN_SWDIO;
+
+    GPIO_InitStruct.GPIO_Pin = PIN_SWCLK | PIN_SWDIO;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(SWD_GPIO, &GPIO_InitStruct);
 }
 
 /** Disable JTAG/SWD I/O Pins.
@@ -95,11 +95,11 @@ static void PORT_SWD_SETUP(void)
 */
 static void PORT_OFF(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct;
-	
-	GPIO_InitStruct.GPIO_Pin = PIN_SWCLK | PIN_SWDIO;
-	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-	GPIO_Init(SWD_GPIO, &GPIO_InitStruct);
+    GPIO_InitTypeDef GPIO_InitStruct;
+
+    GPIO_InitStruct.GPIO_Pin = PIN_SWCLK | PIN_SWDIO;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(SWD_GPIO, &GPIO_InitStruct);
 }
 
 
@@ -113,7 +113,7 @@ static __inline uint32_t PIN_SWCLK_TCK_IN(void)
 
 static __inline void PIN_SWCLK_TCK_SET(void)
 {
-	SWD_GPIO->BSRR = PIN_SWCLK;
+    SWD_GPIO->BSRR = PIN_SWCLK;
 }
 
 static __inline void PIN_SWCLK_TCK_CLR(void)
@@ -148,22 +148,28 @@ static __inline uint32_t PIN_SWDIO_IN(void)
 
 static __inline void PIN_SWDIO_OUT(uint32_t bit)
 {
-    if(bit & 1) SWD_GPIO->BSRR = PIN_SWDIO;
-    else        SWD_GPIO->BRR  = PIN_SWDIO;
+    if (bit & 1)
+    {
+        SWD_GPIO->BSRR = PIN_SWDIO;
+    }
+    else
+    {
+        SWD_GPIO->BRR  = PIN_SWDIO;
+    }
 }
 
 static __inline void PIN_SWDIO_OUT_ENABLE(void)
 {
-	SWD_GPIO->CRH &= ~(0xF << (14 - 8) * 4);
-    SWD_GPIO->CRH |=  (0x3 << (14 - 8) * 4);
-	SWD_GPIO->BRR  = PIN_SWDIO;
+    SWD_GPIO->CRH &= ~(0xF << (14 - 8) * 4);
+    SWD_GPIO->CRH |= (0x3 << (14 - 8) * 4);
+    SWD_GPIO->BRR  = PIN_SWDIO;
 }
 
 static __inline void PIN_SWDIO_OUT_DISABLE(void)
 {
     SWD_GPIO->CRH &= ~(0xF << (14 - 8) * 4);
-	SWD_GPIO->CRH |=  (0x8 << (14 - 8) * 4);
-	SWD_GPIO->BSRR = PIN_SWDIO;
+    SWD_GPIO->CRH |= (0x8 << (14 - 8) * 4);
+    SWD_GPIO->BSRR = PIN_SWDIO;
 }
 
 
@@ -173,7 +179,7 @@ static __inline uint32_t PIN_TDI_IN(void)
 {
 #if (DAP_JTAG != 0)
 #endif
-	return 0;
+    return 0;
 }
 
 static __inline void PIN_TDI_OUT(uint32_t bit)
@@ -189,7 +195,7 @@ static __inline uint32_t PIN_TDO_IN(void)
 {
 #if (DAP_JTAG != 0)
 #endif
-	return 0;
+    return 0;
 }
 
 
@@ -232,9 +238,9 @@ static __inline void LED_RUNNING_OUT(uint32_t bit)
 
 static void DAP_SETUP(void)
 {
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-	
-	PORT_OFF();
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+
+    PORT_OFF();
 }
 
 

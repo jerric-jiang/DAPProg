@@ -4,13 +4,15 @@
 #include <stdint.h>
 
 
-typedef struct {
+typedef struct
+{
     uint32_t breakpoint;
     uint32_t static_base;
     uint32_t stack_pointer;
 } program_syscall_t;
 
-typedef struct {
+typedef struct
+{
     const uint32_t  init;
     const uint32_t  uninit;
     const uint32_t  erase_chip;
@@ -24,7 +26,8 @@ typedef struct {
     const uint32_t  program_buffer_size;
 } program_target_t;
 
-typedef struct {
+typedef struct
+{
     const uint32_t start;
     const uint32_t size;
 } sector_info_t;

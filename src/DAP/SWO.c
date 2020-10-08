@@ -66,143 +66,185 @@ static volatile uint32_t TraceOut     = 0U; /* Outgoing Trace Index */
 static volatile uint32_t TracePending = 0U; /* Pending Trace Count */
 
 // Trace Helper functions
-static void     ClearTrace     (void);
-static uint32_t GetTraceSpace  (void);
-static uint32_t GetTraceCount  (void);
-static uint8_t  GetTraceStatus (void);
-static void     SetTraceError  (uint8_t flag);
+static void     ClearTrace(void);
+static uint32_t GetTraceSpace(void);
+static uint32_t GetTraceCount(void);
+static uint8_t  GetTraceStatus(void);
+static void     SetTraceError(uint8_t flag);
 
 
 #if (SWO_UART != 0)
 
 // USART Driver Callback function
 //   event: event mask
-static void USART_Callback (uint32_t event) {
-  uint32_t count;
+static void USART_Callback(uint32_t event)
+{
+    uint32_t count;
 
-  if (event &  ARM_USART_EVENT_RECEIVE_COMPLETE) {
-    TracePending = 0U;
-    TraceIn += pUSART->GetRxCount();
-    count = GetTraceSpace();
-    if (count != 0U) {
-      pUSART->Receive(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE-1U)], count);
-    } else {
-      TraceStatus = DAP_SWO_CAPTURE_ACTIVE | DAP_SWO_CAPTURE_PAUSED;
+    if (event &  ARM_USART_EVENT_RECEIVE_COMPLETE)
+    {
+        TracePending = 0U;
+        TraceIn += pUSART->GetRxCount();
+        count = GetTraceSpace();
+        if (count != 0U)
+        {
+            pUSART->Receive(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE - 1U)], count);
+        }
+        else
+        {
+            TraceStatus = DAP_SWO_CAPTURE_ACTIVE | DAP_SWO_CAPTURE_PAUSED;
+        }
     }
-  }
-  if (event &  ARM_USART_EVENT_RX_OVERFLOW) {
-    SetTraceError(DAP_SWO_BUFFER_OVERRUN);
-  }
-  if (event & (ARM_USART_EVENT_RX_BREAK         |
-               ARM_USART_EVENT_RX_FRAMING_ERROR |
-               ARM_USART_EVENT_RX_PARITY_ERROR)) {
-    SetTraceError(DAP_SWO_STREAM_ERROR);
-  }
+    if (event &  ARM_USART_EVENT_RX_OVERFLOW)
+    {
+        SetTraceError(DAP_SWO_BUFFER_OVERRUN);
+    }
+    if (event & (ARM_USART_EVENT_RX_BREAK         |
+                 ARM_USART_EVENT_RX_FRAMING_ERROR |
+                 ARM_USART_EVENT_RX_PARITY_ERROR))
+    {
+        SetTraceError(DAP_SWO_STREAM_ERROR);
+    }
 }
 
 // Enable or disable UART SWO Mode
 //   enable: enable flag
 //   return: 1 - Success, 0 - Error
-__weak uint32_t UART_SWO_Mode (uint32_t enable) {
-  int32_t status;
+__weak uint32_t UART_SWO_Mode(uint32_t enable)
+{
+    int32_t status;
 
-  USART_Ready = 0U;
+    USART_Ready = 0U;
 
-  if (enable) {
-    status = pUSART->Initialize(USART_Callback);
-    if (status != ARM_DRIVER_OK) { return (0U); }
-    status = pUSART->PowerControl(ARM_POWER_FULL);
-    if (status != ARM_DRIVER_OK) {
-      pUSART->Uninitialize();
-      return (0U);
+    if (enable)
+    {
+        status = pUSART->Initialize(USART_Callback);
+        if (status != ARM_DRIVER_OK)
+        {
+            return (0U);
+        }
+        status = pUSART->PowerControl(ARM_POWER_FULL);
+        if (status != ARM_DRIVER_OK)
+        {
+            pUSART->Uninitialize();
+            return (0U);
+        }
     }
-  } else {
-    pUSART->Control(ARM_USART_ABORT_RECEIVE, 0U);
-    pUSART->PowerControl(ARM_POWER_OFF);
-    pUSART->Uninitialize();
-  }
-  return (1U);
+    else
+    {
+        pUSART->Control(ARM_USART_ABORT_RECEIVE, 0U);
+        pUSART->PowerControl(ARM_POWER_OFF);
+        pUSART->Uninitialize();
+    }
+    return (1U);
 }
 
 // Configure UART SWO Baudrate
 //   baudrate: requested baudrate
 //   return:   actual baudrate or 0 when not configured
-__weak uint32_t UART_SWO_Baudrate (uint32_t baudrate) {
-  int32_t  status;
-  uint32_t count;
+__weak uint32_t UART_SWO_Baudrate(uint32_t baudrate)
+{
+    int32_t  status;
+    uint32_t count;
 
-  if (baudrate > SWO_UART_MAX_BAUDRATE) {
-    baudrate = SWO_UART_MAX_BAUDRATE;
-  }
-
-  if (TraceStatus & DAP_SWO_CAPTURE_ACTIVE) {
-    pUSART->Control(ARM_USART_CONTROL_RX, 0U);
-    if (pUSART->GetStatus().rx_busy) {
-      TracePending = 0U;
-      TraceIn += pUSART->GetRxCount();
-      pUSART->Control(ARM_USART_ABORT_RECEIVE, 0U);
+    if (baudrate > SWO_UART_MAX_BAUDRATE)
+    {
+        baudrate = SWO_UART_MAX_BAUDRATE;
     }
-  }
 
-  status = pUSART->Control(ARM_USART_MODE_ASYNCHRONOUS |
-                           ARM_USART_DATA_BITS_8       |
-                           ARM_USART_PARITY_NONE       |
-                           ARM_USART_STOP_BITS_1,
-                           baudrate);
-
-  if (status == ARM_DRIVER_OK) {
-    USART_Ready = 1U;
-  } else {
-    USART_Ready = 0U;
-    baudrate = 0U;
-  }
-
-  if ((TraceStatus & DAP_SWO_CAPTURE_ACTIVE) && USART_Ready) {
-    pUSART->Control(ARM_USART_CONTROL_RX, 1U);
-    count = GetTraceSpace();
-    if (count != 0U) {
-      pUSART->Receive(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE-1U)], count);
-    } else {
-      TraceStatus = DAP_SWO_CAPTURE_ACTIVE | DAP_SWO_CAPTURE_PAUSED;
+    if (TraceStatus & DAP_SWO_CAPTURE_ACTIVE)
+    {
+        pUSART->Control(ARM_USART_CONTROL_RX, 0U);
+        if (pUSART->GetStatus().rx_busy)
+        {
+            TracePending = 0U;
+            TraceIn += pUSART->GetRxCount();
+            pUSART->Control(ARM_USART_ABORT_RECEIVE, 0U);
+        }
     }
-  }
 
-  return (baudrate);
+    status = pUSART->Control(ARM_USART_MODE_ASYNCHRONOUS |
+                             ARM_USART_DATA_BITS_8       |
+                             ARM_USART_PARITY_NONE       |
+                             ARM_USART_STOP_BITS_1,
+                             baudrate);
+
+    if (status == ARM_DRIVER_OK)
+    {
+        USART_Ready = 1U;
+    }
+    else
+    {
+        USART_Ready = 0U;
+        baudrate = 0U;
+    }
+
+    if ((TraceStatus & DAP_SWO_CAPTURE_ACTIVE) && USART_Ready)
+    {
+        pUSART->Control(ARM_USART_CONTROL_RX, 1U);
+        count = GetTraceSpace();
+        if (count != 0U)
+        {
+            pUSART->Receive(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE - 1U)], count);
+        }
+        else
+        {
+            TraceStatus = DAP_SWO_CAPTURE_ACTIVE | DAP_SWO_CAPTURE_PAUSED;
+        }
+    }
+
+    return (baudrate);
 }
 
 // Control UART SWO Capture
 //   active: active flag
 //   return: 1 - Success, 0 - Error
-__weak uint32_t UART_SWO_Control (uint32_t active) {
-  int32_t status;
+__weak uint32_t UART_SWO_Control(uint32_t active)
+{
+    int32_t status;
 
-  if (active) {
-    if (!USART_Ready) { return (0U); }
-    status = pUSART->Control(ARM_USART_CONTROL_RX, 1U);
-    if (status != ARM_DRIVER_OK) { return (0U); }
-    status = pUSART->Receive(TraceBuf, SWO_BUFFER_SIZE);
-    if (status != ARM_DRIVER_OK) { return (0U); }
-  } else {
-    pUSART->Control(ARM_USART_CONTROL_RX, 0U);
-    if (pUSART->GetStatus().rx_busy) {
-      TracePending = 0U;
-      TraceIn += pUSART->GetRxCount();
-      pUSART->Control(ARM_USART_ABORT_RECEIVE, 0U);
+    if (active)
+    {
+        if (!USART_Ready)
+        {
+            return (0U);
+        }
+        status = pUSART->Control(ARM_USART_CONTROL_RX, 1U);
+        if (status != ARM_DRIVER_OK)
+        {
+            return (0U);
+        }
+        status = pUSART->Receive(TraceBuf, SWO_BUFFER_SIZE);
+        if (status != ARM_DRIVER_OK)
+        {
+            return (0U);
+        }
     }
-  }
-  return (1U);
+    else
+    {
+        pUSART->Control(ARM_USART_CONTROL_RX, 0U);
+        if (pUSART->GetStatus().rx_busy)
+        {
+            TracePending = 0U;
+            TraceIn += pUSART->GetRxCount();
+            pUSART->Control(ARM_USART_ABORT_RECEIVE, 0U);
+        }
+    }
+    return (1U);
 }
 
 // Start UART SWO Capture
 //   buf:   pointer to buffer for capturing
 //   count: number of bytes to capture
-__weak void UART_SWO_Capture (uint8_t *buf, uint32_t count) {
-  pUSART->Receive(buf, count);
+__weak void UART_SWO_Capture(uint8_t *buf, uint32_t count)
+{
+    pUSART->Receive(buf, count);
 }
 
 // Update UART SWO Trace Info
-__weak void UART_SWO_Update (void) {
-  TracePending = pUSART->GetRxCount();
+__weak void UART_SWO_Update(void)
+{
+    TracePending = pUSART->GetRxCount();
 }
 
 #endif  /* (SWO_UART != 0) */
@@ -213,99 +255,114 @@ __weak void UART_SWO_Update (void) {
 // Enable or disable Manchester SWO Mode
 //   enable: enable flag
 //   return: 1 - Success, 0 - Error
-__weak uint32_t Manchester_SWO_Mode (uint32_t enable) {
-  return (0U);
+__weak uint32_t Manchester_SWO_Mode(uint32_t enable)
+{
+    return (0U);
 }
 
 // Configure Manchester SWO Baudrate
 //   baudrate: requested baudrate
 //   return:   actual baudrate or 0 when not configured
-__weak uint32_t Manchester_SWO_Baudrate (uint32_t baudrate) {
-  return (0U);
+__weak uint32_t Manchester_SWO_Baudrate(uint32_t baudrate)
+{
+    return (0U);
 }
 
 // Control Manchester SWO Capture
 //   active: active flag
 //   return: 1 - Success, 0 - Error
-__weak uint32_t Manchester_SWO_Control (uint32_t active) {
-  return (0U);
+__weak uint32_t Manchester_SWO_Control(uint32_t active)
+{
+    return (0U);
 }
 
 // Start Manchester SWO Capture
 //   buf:   pointer to buffer for capturing
 //   count: number of bytes to capture
-__weak void Manchester_SWO_Capture (uint8_t *buf, uint32_t count) {
+__weak void Manchester_SWO_Capture(uint8_t *buf, uint32_t count)
+{
 }
 
 // Update Manchester SWO Trace Info
-__weak void Manchester_SWO_Update (void) {
+__weak void Manchester_SWO_Update(void)
+{
 }
 
 #endif  /* (SWO_MANCHESTER != 0) */
 
 
 // Clear Trace Errors and Data
-static void ClearTrace (void) {
-  TraceError[0] = 0U;
-  TraceError[1] = 0U;
-  TraceError_n  = 0U;
-  TraceIn       = 0U;
-  TraceOut      = 0U;
-  TracePending  = 0U;
+static void ClearTrace(void)
+{
+    TraceError[0] = 0U;
+    TraceError[1] = 0U;
+    TraceError_n  = 0U;
+    TraceIn       = 0U;
+    TraceOut      = 0U;
+    TracePending  = 0U;
 }
 
 // Get Trace Space
 //   return: number of contiguous free bytes in trace buffer
-static uint32_t GetTraceSpace (void) {
-  uint32_t index;
-  uint32_t limit;
-  uint32_t count;
+static uint32_t GetTraceSpace(void)
+{
+    uint32_t index;
+    uint32_t limit;
+    uint32_t count;
 
-  index = TraceIn & (SWO_BUFFER_SIZE-1U);
-  limit = SWO_BUFFER_SIZE - index;
-  count = SWO_BUFFER_SIZE - (TraceIn - TraceOut);
-  if (count > limit) {
-    count = limit;
-  }
+    index = TraceIn & (SWO_BUFFER_SIZE - 1U);
+    limit = SWO_BUFFER_SIZE - index;
+    count = SWO_BUFFER_SIZE - (TraceIn - TraceOut);
+    if (count > limit)
+    {
+        count = limit;
+    }
 
-  return (count);
+    return (count);
 }
 
 // Get Trace Count
 //   return: number of available data bytes in trace buffer
-static uint32_t GetTraceCount (void) {
-  uint32_t count;
+static uint32_t GetTraceCount(void)
+{
+    uint32_t count;
 
-  if (TraceStatus == DAP_SWO_CAPTURE_ACTIVE) {
-    count = (TraceIn - TraceOut) + TracePending;
-    if (TracePending == 0U) {
-      count = TraceIn - TraceOut;
+    if (TraceStatus == DAP_SWO_CAPTURE_ACTIVE)
+    {
+        count = (TraceIn - TraceOut) + TracePending;
+        if (TracePending == 0U)
+        {
+            count = TraceIn - TraceOut;
+        }
     }
-  } else {
-    count = TraceIn - TraceOut;
-  }
+    else
+    {
+        count = TraceIn - TraceOut;
+    }
 
-  return (count);
+    return (count);
 }
 
 // Get Trace Status (clear Error flags)
 //   return: Trace Status (Active flag and Error flags)
-static uint8_t GetTraceStatus (void) {
-  uint8_t  status;
-  uint32_t n;
+static uint8_t GetTraceStatus(void)
+{
+    uint8_t  status;
+    uint32_t n;
 
-  n = TraceError_n;
-  TraceError_n ^= 1U;
-  status = TraceStatus | TraceError[n];
-  TraceError[n] = 0U;
+    n = TraceError_n;
+    TraceError_n ^= 1U;
+    status = TraceStatus | TraceError[n];
+    TraceError[n] = 0U;
 
-  return (status);
+    return (status);
 }
 
 // Set Trace Error flag(s)
 //   flag:  error flag(s) to set
-static void SetTraceError (uint8_t flag) {
-  TraceError[TraceError_n] |= flag;
+static void SetTraceError(uint8_t flag)
+{
+    TraceError[TraceError_n] |= flag;
 }
 
 
@@ -314,33 +371,41 @@ static void SetTraceError (uint8_t flag) {
 //   response: pointer to response data
 //   return:   number of bytes in response (lower 16 bits)
 //             number of bytes in request (upper 16 bits)
-uint32_t SWO_Transport (const uint8_t *request, uint8_t *response) {
-  uint8_t  transport;
-  uint32_t result;
+uint32_t SWO_Transport(const uint8_t *request, uint8_t *response)
+{
+    uint8_t  transport;
+    uint32_t result;
 
-  if (!(TraceStatus & DAP_SWO_CAPTURE_ACTIVE)) {
-    transport = *request;
-    switch (transport) {
-      case 0:
-      case 1:
-        TraceTransport = transport;
-        result = 1U;
-        break;
-      default:
-        result = 0U;
-        break;
+    if (!(TraceStatus & DAP_SWO_CAPTURE_ACTIVE))
+    {
+        transport = *request;
+        switch (transport)
+        {
+            case 0:
+            case 1:
+                TraceTransport = transport;
+                result = 1U;
+                break;
+            default:
+                result = 0U;
+                break;
+        }
     }
-  } else {
-    result = 0U;
-  }
+    else
+    {
+        result = 0U;
+    }
 
-  if (result != 0U) {
-    *response = DAP_OK;
-  } else {
-    *response = DAP_ERROR;
-  }
+    if (result != 0U)
+    {
+        *response = DAP_OK;
+    }
+    else
+    {
+        *response = DAP_ERROR;
+    }
 
-  return ((1U << 16) | 1U);
+    return ((1U << 16) | 1U);
 }
 
 
@@ -349,59 +414,68 @@ uint32_t SWO_Transport (const uint8_t *request, uint8_t *response) {
 //   response: pointer to response data
 //   return:   number of bytes in response (lower 16 bits)
 //             number of bytes in request (upper 16 bits)
-uint32_t SWO_Mode (const uint8_t *request, uint8_t *response) {
-  uint8_t  mode;
-  uint32_t result;
+uint32_t SWO_Mode(const uint8_t *request, uint8_t *response)
+{
+    uint8_t  mode;
+    uint32_t result;
 
-  mode = *request;
+    mode = *request;
 
-  switch (TraceMode) {
+    switch (TraceMode)
+    {
 #if (SWO_UART != 0)
-    case DAP_SWO_UART:
-      UART_SWO_Mode(0U);
-      break;
+        case DAP_SWO_UART:
+            UART_SWO_Mode(0U);
+            break;
 #endif
 #if (SWO_MANCHESTER != 0)
-    case DAP_SWO_MANCHESTER:
-      Manchester_SWO_Mode(0U);
-      break;
+        case DAP_SWO_MANCHESTER:
+            Manchester_SWO_Mode(0U);
+            break;
 #endif
-    default:
-      break;
-  }
-  switch (mode) {
-    case DAP_SWO_OFF:
-      result = 1U;
-      break;
+        default:
+            break;
+    }
+    switch (mode)
+    {
+        case DAP_SWO_OFF:
+            result = 1U;
+            break;
 #if (SWO_UART != 0)
-    case DAP_SWO_UART:
-      result = UART_SWO_Mode(1U);
-      break;
+        case DAP_SWO_UART:
+            result = UART_SWO_Mode(1U);
+            break;
 #endif
 #if (SWO_MANCHESTER != 0)
-    case DAP_SWO_MANCHESTER:
-      result = Manchester_SWO_Mode(1U);
-      break;
+        case DAP_SWO_MANCHESTER:
+            result = Manchester_SWO_Mode(1U);
+            break;
 #endif
-    default:
-      result = 0U;
-      break;
-  }
-  if (result != 0U) {
-    TraceMode = mode;
-  } else {
-    TraceMode = DAP_SWO_OFF;
-  }
-  TraceStatus = 0U;
-  ClearTrace();
+        default:
+            result = 0U;
+            break;
+    }
+    if (result != 0U)
+    {
+        TraceMode = mode;
+    }
+    else
+    {
+        TraceMode = DAP_SWO_OFF;
+    }
+    TraceStatus = 0U;
+    ClearTrace();
 
-  if (result != 0U) {
-    *response = DAP_OK;
-  } else {
-    *response = DAP_ERROR;
-  }
+    if (result != 0U)
+    {
+        *response = DAP_OK;
+    }
+    else
+    {
+        *response = DAP_ERROR;
+    }
 
-  return ((1U << 16) | 1U);
+    return ((1U << 16) | 1U);
 }
 
 
@@ -410,40 +484,43 @@ uint32_t SWO_Mode (const uint8_t *request, uint8_t *response) {
 //   response: pointer to response data
 //   return:   number of bytes in response (lower 16 bits)
 //             number of bytes in request (upper 16 bits)
-uint32_t SWO_Baudrate (const uint8_t *request, uint8_t *response) {
-  uint32_t baudrate;
+uint32_t SWO_Baudrate(const uint8_t *request, uint8_t *response)
+{
+    uint32_t baudrate;
 
-  baudrate = (*(request+0) <<  0) |
-             (*(request+1) <<  8) |
-             (*(request+2) << 16) |
-             (*(request+3) << 24);
+    baudrate = (*(request + 0) <<  0) |
+               (*(request + 1) <<  8) |
+               (*(request + 2) << 16) |
+               (*(request + 3) << 24);
 
-  switch (TraceMode) {
+    switch (TraceMode)
+    {
 #if (SWO_UART != 0)
-    case DAP_SWO_UART:
-      baudrate = UART_SWO_Baudrate(baudrate);
-      break;
+        case DAP_SWO_UART:
+            baudrate = UART_SWO_Baudrate(baudrate);
+            break;
 #endif
 #if (SWO_MANCHESTER != 0)
-    case DAP_SWO_MANCHESTER:
-      baudrate = Manchester_SWO_Baudrate(baudrate);
-      break;
+        case DAP_SWO_MANCHESTER:
+            baudrate = Manchester_SWO_Baudrate(baudrate);
+            break;
 #endif
-    default:
-      baudrate = 0U;
-      break;
-  }
+        default:
+            baudrate = 0U;
+            break;
+    }
 
-  if (baudrate == 0U) {
-    TraceStatus = 0U;
-  }
+    if (baudrate == 0U)
+    {
+        TraceStatus = 0U;
+    }
 
-  *response++ = (uint8_t)(baudrate >>  0);
-  *response++ = (uint8_t)(baudrate >>  8);
-  *response++ = (uint8_t)(baudrate >> 16);
-  *response   = (uint8_t)(baudrate >> 24);
+    *response++ = (uint8_t)(baudrate >>  0);
+    *response++ = (uint8_t)(baudrate >>  8);
+    *response++ = (uint8_t)(baudrate >> 16);
+    *response   = (uint8_t)(baudrate >> 24);
 
-  return ((4U << 16) | 4U);
+    return ((4U << 16) | 4U);
 }
 
 
@@ -452,82 +529,95 @@ uint32_t SWO_Baudrate (const uint8_t *request, uint8_t *response) {
 //   response: pointer to response data
 //   return:   number of bytes in response (lower 16 bits)
 //             number of bytes in request (upper 16 bits)
-uint32_t SWO_Control (const uint8_t *request, uint8_t *response) {
-  uint8_t  active;
-  uint32_t result;
+uint32_t SWO_Control(const uint8_t *request, uint8_t *response)
+{
+    uint8_t  active;
+    uint32_t result;
 
-  active = *request & DAP_SWO_CAPTURE_ACTIVE;
+    active = *request & DAP_SWO_CAPTURE_ACTIVE;
 
-  if (active != (TraceStatus & DAP_SWO_CAPTURE_ACTIVE)) {
-    if (active) {
-      ClearTrace();
-    }
-    switch (TraceMode) {
+    if (active != (TraceStatus & DAP_SWO_CAPTURE_ACTIVE))
+    {
+        if (active)
+        {
+            ClearTrace();
+        }
+        switch (TraceMode)
+        {
 #if (SWO_UART != 0)
-      case DAP_SWO_UART:
-        result = UART_SWO_Control(active);
-        break;
+            case DAP_SWO_UART:
+                result = UART_SWO_Control(active);
+                break;
 #endif
 #if (SWO_MANCHESTER != 0)
-      case DAP_SWO_MANCHESTER:
-        result = Manchester_SWO_Control(active);
-        break;
+            case DAP_SWO_MANCHESTER:
+                result = Manchester_SWO_Control(active);
+                break;
 #endif
-      default:
-        result = 0U;
-        break;
+            default:
+                result = 0U;
+                break;
+        }
+        if (result != 0U)
+        {
+            TraceStatus = active;
+        }
     }
-    if (result != 0U) {
-      TraceStatus = active;
+    else
+    {
+        result = 1U;
     }
-  } else {
-    result = 1U;
-  }
 
-  if (result != 0U) {
-    *response = DAP_OK;
-  } else {
-    *response = DAP_ERROR;
-  }
+    if (result != 0U)
+    {
+        *response = DAP_OK;
+    }
+    else
+    {
+        *response = DAP_ERROR;
+    }
 
-  return ((1U << 16) | 1U);
+    return ((1U << 16) | 1U);
 }
 
 
 // Process SWO Status command and prepare response
 //   response: pointer to response data
 //   return:   number of bytes in response
-uint32_t SWO_Status (uint8_t *response) {
-  uint8_t  status;
-  uint32_t count;
+uint32_t SWO_Status(uint8_t *response)
+{
+    uint8_t  status;
+    uint32_t count;
 
-  if (TraceStatus == DAP_SWO_CAPTURE_ACTIVE) {
-    switch (TraceMode) {
+    if (TraceStatus == DAP_SWO_CAPTURE_ACTIVE)
+    {
+        switch (TraceMode)
+        {
 #if (SWO_UART != 0)
-      case DAP_SWO_UART:
-        UART_SWO_Update();
-        break;
+            case DAP_SWO_UART:
+                UART_SWO_Update();
+                break;
 #endif
 #if (SWO_MANCHESTER != 0)
-      case DAP_SWO_MANCHESTER:
-        Manchester_SWO_Update();
-        break;
+            case DAP_SWO_MANCHESTER:
+                Manchester_SWO_Update();
+                break;
 #endif
-      default:
-        break;
+            default:
+                break;
+        }
     }
-  }
 
-  status = GetTraceStatus();
-  count  = GetTraceCount();
+    status = GetTraceStatus();
+    count  = GetTraceCount();
 
-  *response++ = status;
-  *response++ = (uint8_t)(count >>  0);
-  *response++ = (uint8_t)(count >>  8);
-  *response++ = (uint8_t)(count >> 16);
-  *response   = (uint8_t)(count >> 24);
+    *response++ = status;
+    *response++ = (uint8_t)(count >>  0);
+    *response++ = (uint8_t)(count >>  8);
+    *response++ = (uint8_t)(count >> 16);
+    *response   = (uint8_t)(count >> 24);
 
-  return (5U);
+    return (5U);
 }
 
 
@@ -536,72 +626,83 @@ uint32_t SWO_Status (uint8_t *response) {
 //   response: pointer to response data
 //   return:   number of bytes in response (lower 16 bits)
 //             number of bytes in request (upper 16 bits)
-uint32_t SWO_Data (const uint8_t *request, uint8_t *response) {
-  uint8_t  status;
-  uint32_t count;
-  uint32_t n;
+uint32_t SWO_Data(const uint8_t *request, uint8_t *response)
+{
+    uint8_t  status;
+    uint32_t count;
+    uint32_t n;
 
-  if (TraceStatus == DAP_SWO_CAPTURE_ACTIVE) {
-    switch (TraceMode) {
+    if (TraceStatus == DAP_SWO_CAPTURE_ACTIVE)
+    {
+        switch (TraceMode)
+        {
 #if (SWO_UART != 0)
-      case DAP_SWO_UART:
-        UART_SWO_Update();
-        break;
+            case DAP_SWO_UART:
+                UART_SWO_Update();
+                break;
 #endif
 #if (SWO_MANCHESTER != 0)
-      case DAP_SWO_MANCHESTER:
-        Manchester_SWO_Update();
-        break;
+            case DAP_SWO_MANCHESTER:
+                Manchester_SWO_Update();
+                break;
 #endif
-      default:
-        break;
+            default:
+                break;
+        }
     }
-  }
 
-  status = GetTraceStatus();
-  count  = GetTraceCount();
+    status = GetTraceStatus();
+    count  = GetTraceCount();
 
-  if (TraceTransport == 1U) {
-    n = (*(request+0) << 0) |
-        (*(request+1) << 8);
-  } else {
-    n = 0U;
-  }
-  if (count > n) {
-    count = n;
-  }
+    if (TraceTransport == 1U)
+    {
+        n = (*(request + 0) << 0) |
+            (*(request + 1) << 8);
+    }
+    else
+    {
+        n = 0U;
+    }
+    if (count > n)
+    {
+        count = n;
+    }
 
-  *response++ = status;
-  *response++ = (uint8_t)(count >> 0);
-  *response++ = (uint8_t)(count >> 8);
+    *response++ = status;
+    *response++ = (uint8_t)(count >> 0);
+    *response++ = (uint8_t)(count >> 8);
 
-  for (n = count; n; n--) {
-    *response++ = TraceBuf[TraceOut++ & (SWO_BUFFER_SIZE-1U)];
-  }
+    for (n = count; n; n--)
+    {
+        *response++ = TraceBuf[TraceOut++ & (SWO_BUFFER_SIZE - 1U)];
+    }
 
-  if (TraceStatus == (DAP_SWO_CAPTURE_ACTIVE | DAP_SWO_CAPTURE_PAUSED)) {
-    n = GetTraceSpace();
-    if (n != 0U) {
-      switch (TraceMode) {
+    if (TraceStatus == (DAP_SWO_CAPTURE_ACTIVE | DAP_SWO_CAPTURE_PAUSED))
+    {
+        n = GetTraceSpace();
+        if (n != 0U)
+        {
+            switch (TraceMode)
+            {
 #if (SWO_UART != 0)
-        case DAP_SWO_UART:
-          UART_SWO_Capture(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE-1U)], n);
-          TraceStatus = DAP_SWO_CAPTURE_ACTIVE;
-          break;
+                case DAP_SWO_UART:
+                    UART_SWO_Capture(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE - 1U)], n);
+                    TraceStatus = DAP_SWO_CAPTURE_ACTIVE;
+                    break;
 #endif
 #if (SWO_MANCHESTER != 0)
-        case DAP_SWO_MANCHESTER:
-          Manchester_SWO_Capture(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE-1U)], n);
-          TraceStatus = DAP_SWO_CAPTURE_ACTIVE;
-          break;
+                case DAP_SWO_MANCHESTER:
+                    Manchester_SWO_Capture(&TraceBuf[TraceIn & (SWO_BUFFER_SIZE - 1U)], n);
+                    TraceStatus = DAP_SWO_CAPTURE_ACTIVE;
+                    break;
 #endif
-        default:
-          break;
-      }
+                default:
+                    break;
+            }
+        }
     }
-  }
 
-  return ((2U << 16) | (3U + count));
+    return ((2U << 16) | (3U + count));
 }
 
 

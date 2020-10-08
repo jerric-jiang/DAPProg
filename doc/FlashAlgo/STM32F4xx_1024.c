@@ -3,7 +3,8 @@
  */
 #include "flash_blob.h"
 
-static const uint32_t flash_code[] = {
+static const uint32_t flash_code[] =
+{
     0xE00ABE00, 0x062D780D, 0x24084068, 0xD3000040, 0x1E644058, 0x1C49D1FA, 0x2A001E52, 0x4770D1F2,
     0x0E000300, 0xD3022820, 0x1D000940, 0x28104770, 0x0900D302, 0x47701CC0, 0x47700880, 0x49414842,
     0x49426041, 0x21006041, 0x68C16001, 0x431122F0, 0x694060C1, 0xD4060680, 0x493D483E, 0x21066001,
@@ -18,7 +19,8 @@ static const uint32_t flash_code[] = {
     0x00000201, 0x00000000
 };
 
-const program_target_t flash_algo = {
+const program_target_t flash_algo =
+{
     0x2000003D,  // Init
     0x2000006B,  // UnInit
     0x20000079,  // EraseChip

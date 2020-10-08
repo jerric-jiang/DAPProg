@@ -6,7 +6,8 @@
 #include "algo/flash_blob.h"
 
 
-typedef enum {
+typedef enum
+{
     RESET_HOLD,              // Hold target in reset
     RESET_PROGRAM,           // Reset target and setup for flash programming.
     RESET_RUN,               // Reset target and run normally

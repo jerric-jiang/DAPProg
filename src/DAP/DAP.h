@@ -187,32 +187,36 @@ extern "C" {
 #include <stdint.h>
 
 // DAP Data structure
-typedef struct {
-  uint8_t     debug_port;                       // Debug Port
-  uint8_t     fast_clock;                       // Fast Clock Flag
-  uint32_t   clock_delay;                       // Clock Delay
-  struct {                                      // Transfer Configuration
-    uint8_t   idle_cycles;                      // Idle cycles after transfer
-    uint16_t  retry_count;                      // Number of retries after WAIT response
-    uint16_t  match_retry;                      // Number of retries if read value does not match
-    uint32_t  match_mask;                       // Match Mask
-  } transfer;
+typedef struct
+{
+    uint8_t     debug_port;                       // Debug Port
+    uint8_t     fast_clock;                       // Fast Clock Flag
+    uint32_t   clock_delay;                       // Clock Delay
+    struct                                        // Transfer Configuration
+    {
+        uint8_t   idle_cycles;                      // Idle cycles after transfer
+        uint16_t  retry_count;                      // Number of retries after WAIT response
+        uint16_t  match_retry;                      // Number of retries if read value does not match
+        uint32_t  match_mask;                       // Match Mask
+    } transfer;
 #if (DAP_SWD != 0)
-  struct {                                      // SWD Configuration
-    uint8_t    turnaround;                      // Turnaround period
-    uint8_t    data_phase;                      // Always generate Data Phase
-  } swd_conf;
+    struct                                        // SWD Configuration
+    {
+        uint8_t    turnaround;                      // Turnaround period
+        uint8_t    data_phase;                      // Always generate Data Phase
+    } swd_conf;
 #endif
 #if (DAP_JTAG != 0)
-  struct {                                      // JTAG Device Chain
-    uint8_t   count;                            // Number of devices
-    uint8_t   index;                            // Device index (device at TDO has index 0)
+    struct                                        // JTAG Device Chain
+    {
+        uint8_t   count;                            // Number of devices
+        uint8_t   index;                            // Device index (device at TDO has index 0)
 #if (DAP_JTAG_DEV_CNT != 0)
-    uint8_t   ir_length[DAP_JTAG_DEV_CNT];      // IR Length in bits
-    uint16_t  ir_before[DAP_JTAG_DEV_CNT];      // Bits before IR
-    uint16_t  ir_after [DAP_JTAG_DEV_CNT];      // Bits after IR
+        uint8_t   ir_length[DAP_JTAG_DEV_CNT];      // IR Length in bits
+        uint16_t  ir_before[DAP_JTAG_DEV_CNT];      // Bits before IR
+        uint16_t  ir_after [DAP_JTAG_DEV_CNT];      // Bits after IR
 #endif
-  } jtag_dev;
+    } jtag_dev;
 #endif
 } DAP_Data_t;
 
@@ -221,53 +225,55 @@ extern volatile uint8_t    DAP_TransferAbort;   // Transfer Abort Flag
 
 
 // Functions
-extern void     SWJ_Sequence    (uint32_t count, const uint8_t *data);
-extern void     JTAG_Sequence   (uint32_t info,  const uint8_t *tdi, uint8_t *tdo);
-extern void     JTAG_IR         (uint32_t ir);
-extern uint32_t JTAG_ReadIDCode (void);
-extern void     JTAG_WriteAbort (uint32_t data);
-extern uint8_t  JTAG_Transfer   (uint32_t request, uint32_t *data);
-extern uint8_t  SWD_Transfer    (uint32_t request, uint32_t *data);
+extern void     SWJ_Sequence(uint32_t count, const uint8_t *data);
+extern void     JTAG_Sequence(uint32_t info,  const uint8_t *tdi, uint8_t *tdo);
+extern void     JTAG_IR(uint32_t ir);
+extern uint32_t JTAG_ReadIDCode(void);
+extern void     JTAG_WriteAbort(uint32_t data);
+extern uint8_t  JTAG_Transfer(uint32_t request, uint32_t *data);
+extern uint8_t  SWD_Transfer(uint32_t request, uint32_t *data);
 
-extern void     Delayms         (uint32_t delay);
+extern void     Delayms(uint32_t delay);
 
-extern uint32_t SWO_Transport   (const uint8_t *request, uint8_t *response);
-extern uint32_t SWO_Mode        (const uint8_t *request, uint8_t *response);
-extern uint32_t SWO_Baudrate    (const uint8_t *request, uint8_t *response);
-extern uint32_t SWO_Control     (const uint8_t *request, uint8_t *response);
-extern uint32_t SWO_Status                              (uint8_t *response);
-extern uint32_t SWO_Data        (const uint8_t *request, uint8_t *response);
+extern uint32_t SWO_Transport(const uint8_t *request, uint8_t *response);
+extern uint32_t SWO_Mode(const uint8_t *request, uint8_t *response);
+extern uint32_t SWO_Baudrate(const uint8_t *request, uint8_t *response);
+extern uint32_t SWO_Control(const uint8_t *request, uint8_t *response);
+extern uint32_t SWO_Status(uint8_t *response);
+extern uint32_t SWO_Data(const uint8_t *request, uint8_t *response);
 
-extern uint32_t DAP_ProcessVendorCommand (const uint8_t *request, uint8_t *response);
-extern uint32_t DAP_ProcessCommand       (const uint8_t *request, uint8_t *response);
-extern uint32_t DAP_ExecuteCommand       (const uint8_t *request, uint8_t *response);
+extern uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response);
+extern uint32_t DAP_ProcessCommand(const uint8_t *request, uint8_t *response);
+extern uint32_t DAP_ExecuteCommand(const uint8_t *request, uint8_t *response);
 
-extern void     DAP_Setup (void);
+extern void     DAP_Setup(void);
 
 // Configurable delay for clock generation
 #ifndef DELAY_SLOW_CYCLES
 #define DELAY_SLOW_CYCLES       3U      // Number of cycles for one iteration
 #endif
-static __forceinline void PIN_DELAY_SLOW (uint32_t delay) {
-  uint32_t count;
+static __forceinline void PIN_DELAY_SLOW(uint32_t delay)
+{
+    uint32_t count;
 
-  count = delay;
-  while (--count);
+    count = delay;
+    while (--count);
 }
 
 // Fixed delay for fast clock generation
 #ifndef DELAY_FAST_CYCLES
 #define DELAY_FAST_CYCLES       0U      // Number of cycles: 0..3
 #endif
-static __forceinline void PIN_DELAY_FAST (void) {
+static __forceinline void PIN_DELAY_FAST(void)
+{
 #if (DELAY_FAST_CYCLES >= 1U)
-  __nop();
+    __nop();
 #endif
 #if (DELAY_FAST_CYCLES >= 2U)
-  __nop();
+    __nop();
 #endif
 #if (DELAY_FAST_CYCLES >= 3U)
-  __nop();
+    __nop();
 #endif
 }
 
