@@ -41,3 +41,4 @@ const program_target_t flash_algo =
     flash_code,  // address of prog_blob
     0x00000400,  // ram_to_flash_bytes_to_be_written
 };
+

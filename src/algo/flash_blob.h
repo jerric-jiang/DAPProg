@@ -32,5 +32,5 @@ typedef struct
     const uint32_t size;
 } sector_info_t;
 
-
 #endif
+

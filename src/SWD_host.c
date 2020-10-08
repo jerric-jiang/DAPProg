@@ -3,7 +3,6 @@
  * @brief   Host driver for accessing the DAP
  */
 #include "swd_host.h"
-
 #include "DAP_config.h"
 #include "DAP.h"
 #include "debug_cm.h"
@@ -851,16 +850,18 @@ uint8_t swd_init_debug(void)
     uint32_t tmp = 0;
     int i = 0;
     int timeout = 100;
+
     // init dap state with fake values
     dap_state.select = 0xffffffff;
     dap_state.csw = 0xffffffff;
-    swd_init();
+
+    swd_init(); // SWD io init
 
     // call a target dependant function
     // this function can do several stuff before really initing the debug
     //target_before_init_debug();
 
-    if (!JTAG2SWD())
+    if (!JTAG2SWD())    //目标芯片的JTAG接口切换成 SWD 模式
     {
         return 0;
     }

@@ -1,66 +1,14 @@
+
 #include <stdio.h>
-
 #include "stm32f10x.h"
-
 #include "SWD_host.h"
 #include "SWD_flash.h"
-
 #include "algo/STM32F10x_128.c"
+
 uint32_t Flash_Page_Size = 1024;
 uint32_t Flash_Start_Addr = 0x08000000;
 
-extern uint8_t STM32F1_demo_code[3604];
-
 uint8_t buff[1024] = {0};
-
-void SerialInit(void);
-
-int main(void)
-{
-    SerialInit();
-
-    swd_init_debug();
-
-    target_flash_init(Flash_Start_Addr);
-
-    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)
-    {
-        target_flash_erase_sector(0x08000000 + addr);
-    }
-
-    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)
-    {
-        swd_read_memory(0x08000000 + addr, buff, 1024);
-        for (uint32_t i = 0; i < 1024; i++)
-        {
-            printf("%02X ", buff[i]);
-        }
-        printf("\r\n\r\n\r\n");
-    }
-
-    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)
-    {
-        target_flash_program_page(0x08000000 + addr, &STM32F1_demo_code[addr], 1024);
-    }
-
-    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)
-    {
-        swd_read_memory(0x08000000 + addr, buff, 1024);
-        for (uint32_t i = 0; i < 1024; i++)
-        {
-            printf("%02X ", buff[i]);
-        }
-        printf("\r\n\r\n\r\n");
-    }
-
-    swd_set_target_state_hw(RUN);
-
-    while (1)
-    {
-
-    }
-}
-
 
 uint8_t STM32F1_demo_code[3604] =
 {
@@ -296,17 +244,19 @@ uint8_t STM32F1_demo_code[3604] =
 void SerialInit(void)
 {
     USART_InitTypeDef USART_InitStructure;
+    GPIO_InitTypeDef GPIO_InitStructure;
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
 
-    GPIO_Init(GPIOA, &(GPIO_InitTypeDef)
-    {
-        GPIO_Pin_2, GPIO_Speed_10MHz, GPIO_Mode_AF_PP
-    });           // UART1-TX
-    GPIO_Init(GPIOA, &(GPIO_InitTypeDef)
-    {
-        GPIO_Pin_3, GPIO_Speed_10MHz, GPIO_Mode_IN_FLOATING
-    });     // UART1-RX
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);     // UART1-TX
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);     // UART1-RX
 
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 
@@ -321,6 +271,61 @@ void SerialInit(void)
 
     USART_Cmd(USART2, ENABLE);
 }
+
+
+/******************************************************************************************************************************************
+* 函数名称: main()
+* 功能说明: 主程序
+* 输    入: 无
+* 输    出: 无
+* 注意事项: 无
+******************************************************************************************************************************************/
+int main(void)
+{
+    SerialInit();   //USART Init
+
+    swd_init_debug();
+
+    target_flash_init(Flash_Start_Addr);    // 把芯片的编程算法下载到目标芯片的SRAM中去
+
+    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)     // sector erase
+    {
+        target_flash_erase_sector(0x08000000 + addr);
+    }
+
+    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)     // read flash check empty
+    {
+        swd_read_memory(0x08000000 + addr, buff, 1024);
+        for (uint32_t i = 0; i < 1024; i++)
+        {
+            printf("%02X ", buff[i]);
+        }
+        printf("\r\n\r\n\r\n");
+    }
+
+    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)     // write flash
+    {
+        target_flash_program_page(0x08000000 + addr, &STM32F1_demo_code[addr], 1024);
+    }
+
+    for (uint32_t addr = 0; addr < sizeof(STM32F1_demo_code); addr += 1024)     // read flash for verify
+    {
+        swd_read_memory(0x08000000 + addr, buff, 1024);
+        for (uint32_t i = 0; i < 1024; i++)
+        {
+            printf("%02X ", buff[i]);
+        }
+        printf("\r\n\r\n\r\n");
+    }
+
+    swd_set_target_state_hw(RUN);
+
+    while (1)
+    {
+
+    }
+}
+
 
 /******************************************************************************************************************************************
 * 函数名称: fputc()
@@ -337,3 +342,4 @@ int fputc(int ch, FILE *f)
 
     return ch;
 }
+
